@@ -3,7 +3,7 @@ import {check} from 'express-validator';
 
 const router =  Router();
 
-import { login, resendPassword, resendVerifyEmail, signUp, validateEmail } from '../controllers/auth.controllers.js'
+import { login, logout, me, refreshToken, signUp, validateEmail } from '../controllers/auth.controllers.js'
 import { requireToken } from '../middlewares/requireToken.js';
 
 
@@ -11,43 +11,32 @@ import { requireToken } from '../middlewares/requireToken.js';
 router.post('/login',[
 ], login);  
 
-// router.get('/loginWithToken',[
-//   requireToken
-// ], loginWithToken);  
+router.post('/logout',[
+], logout);  
 
 
 router.post('/signUp',[
   // validateUserSignUpMiddleware
 ], signUp);  
 
+router.get('/me',[
+], me);  
+
+
+
 
 //es x si alquien intenta hacer alguna accion sin tener la cuenta verificada se le reenvia el link de auth
-router.post('/verifyEmail',[
-  requireToken
-], resendVerifyEmail);  
+// router.post('/verifyEmail',[
+//   requireToken
+// ], verifyEmail);  
+
+router.post('/refreshToken',[
+], refreshToken);  
 
 
 router.post('/validateEmail',[
+  requireToken
 ], validateEmail); 
-
-router.post('/resendPassword',[
-], resendPassword); 
-
-
-// router.post('/activeAccount',[
-//   requireToken,
-//   query('active').trim().escape().notEmpty().withMessage('query "active" is required')
-//   .custom((value) => {
-//       if (!allowedActive.includes(value)) {
-//       throw new Error('Invalid "active" value');
-//       }
-//       return true;
-//   }),
-//   adminRole,
-//   checkFields  
-
-// ], activeAccount); 
-
 
 
 export default router;

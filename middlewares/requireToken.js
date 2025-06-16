@@ -5,6 +5,7 @@ import { JWTSIGNUP } from '../config.js';
 export const requireToken = async (req, res, next) => {
   try {
     const token = req.cookies?.token_musseum; // 👈 leemos la cookie
+    
 
     console.log("token", token);
     
@@ -14,6 +15,7 @@ export const requireToken = async (req, res, next) => {
         message: 'No token found in cookies. Please log in again.',
       });
     }
+
 
     const { email } = jwt.verify(token, JWTSIGNUP);
 
@@ -26,7 +28,6 @@ export const requireToken = async (req, res, next) => {
     }
 
     req.userAuth = userAuth;
-    console.log("userAuth", userAuth);
     
     next();
 
