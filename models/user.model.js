@@ -28,7 +28,6 @@ export const Users = sequelize.define('Users', {
 
   validateEmail: {
     type: DataTypes.STRING(150),
-    allowNull: false,
   },
 
   role: {

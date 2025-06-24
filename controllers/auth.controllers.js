@@ -11,6 +11,8 @@ import { checkLoginLock }  from "../helpers/checkLoginLock.js";
 import { LoginAttempt, Users } from '../models/index.js'
 import { JWTSIGNUP } from '../config.js';
 import { generateTokens } from '../helpers/generateToken.js';
+import { generatePassword } from '../helpers/generatePassword.js';
+import { emailRecover } from '../config/email-recovering.js';
 
 
 
@@ -150,6 +152,84 @@ const logout = (req, res) => {
     success: true,
     message: 'Sesión cerrada correctamente',
   });
+};
+
+const googleCallback = async (req, res) => {
+
+  try {
+    const { id, name, email } = req.user;
+
+    console.log('user', req.user);
+
+    // Buscar o crear usuario
+    let user = await Users.findOne({ where: { email } });
+
+    if (!user) {
+      user = await Users.create({
+        // googleId: id,
+        name,
+        email,
+        // cualquier otro campo que necesites
+      });
+    }
+
+    const accessToken = jwt.sign(
+      { id: user.id, name: user.name, email: user.email },
+      JWTSIGNUP,
+      { expiresIn: '12h' }
+    );
+
+    const accessCookie = serialize('token_musseum', accessToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      path: '/',
+      maxAge: 60 * 60 * 12, // 12h
+    });
+
+      res.setHeader('Set-Cookie', accessCookie);
+
+    console.log('✅ Usuario autenticado y guardado:', user.email);
+
+    res.redirect('http://localhost:3000/recordar-usuario'); // o /dashboard
+  } catch (error) {
+    console.error('❌ Error en googleCallbackController:', error);
+    res.redirect('http://localhost:3000/login?error=oauth');
+  }
+};
+
+const rememberUserAuth = async (req, res) => {
+
+  try {
+    const { remember } = req.body;
+
+    const token = req.cookies.token_musseum;
+
+    if (!token) {
+      return res.status(401).json({ message: 'No token found' });
+    }
+
+    const decoded = jwt.verify(token, JWTSIGNUP);
+
+    const newToken = jwt.sign({ id: decoded.id, email: decoded.email }, JWTSIGNUP, {
+      expiresIn: remember ? '12h' : undefined, // o '1d' si querés más largo
+    });
+
+    const refreshCookie = serialize('refresh_token_musseum', refreshToken, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    path: '/',
+    maxAge: 60 * 60 * 24 * 30, // 30 días
+  });
+
+    res.setHeader('Set-Cookie', refreshCookie);
+
+    return res.status(200).json({ success: true });
+  } catch (error) {
+    console.error('Error en rememberUserAuth:', error);
+    return res.status(500).json({ message: 'Error interno del servidor' });
+  }
 };
 
 // de aca solo se crea la cuenta pero no se verifica, para publicar es necesario verificar la cuenta
@@ -296,117 +376,6 @@ const me = async (req, res) => {
     }
 }
 
-//una vez q el usuario ingresa al link que le mandamos, cambia su estado a "verified"
-const validateEmail = async (req, res) => {
-
-        return res.status(200).json({
-          success: true,
-          message: 'El token es válido'
-      });
-    
-  // try {
-     
-  //    const { email, code } = req.body;
-
-  //    const [rows] = await pool.execute('SELECT * FROM users WHERE Email = ?', [email]);
-  //    const usersToConfirm = rows[0];
-
-  //   const check = await checkUsersStates(email);
-    
-  //   if(!check){
-  //     return
-  //   }
-
-  //   // por si intenta verificar dos veces el mismo email
-  //   if(usersToConfirm.validateEmail === 'VERIFIED'){
-  //     return res.status(200).json({
-  //       success: false,
-  //       message: 'E-mail verificado',
-  //     });
-
-  //    }
-
-  //   if (usersToConfirm.code !== code) {
-  //     return res.status(401).json({
-  //       success: false,
-  //       message: 'Credenciais incorretas',
-  //     });
-  //   }
-      
-  //   usersToConfirm.validateEmail = 'VERIFIED';
-  //   usersToConfirm.role = 'users';
-
-  //        // Actualizar el usuario
-  //   const [result] = await pool.query('UPDATE users set ? WHERE Email = ?', [usersToConfirm, email]);
-
-  //   if (result.affectedRows === 0) {
-  //     return res.status(500).json({
-  //       success: false,
-  //       error: "Falha ao atualizar usuário.",
-  //     });
-  //   }
-
-  //   const insertPermissionRequest = {
-  //     date: new Date(),
-  //     iduser: usersToConfirm.iduser,
-  //     state: "requested",
-  //   }
-    
-  //  await pool.query('INSERT INTO registration_permission SET ?', [insertPermissionRequest]);
-
-  // const [searchUsers] = await pool.query('SELECT * FROM users WHERE Email = ?', [email])
-
-  // const users = searchUsers[0];
-
-  //  //les mando msj a webmasters, admins y super admin q alguien se registro con exito 
-  // let arrEmails = [];
-
-  // const [emailDestination] = await pool.execute('SELECT * FROM users WHERE role IN (?, ?, ?)', ["webmaster", "admin", "super_admin"]);
-
-  //   emailDestination.forEach((users)=>{ arrEmails.push(users.Email)})
-
-  // // await sendAdminEmail(body, administrator.Email);
-
-  // const body = {
-  //     resgisterName : users.Nome_Completo,
-  //     resgisterEmail: users.Email,
-  //     date: new Date(),
-  //     Nome_da_sede: users.Nome_da_sede,
-  //     Pais_da_sede: users.Pais_da_sede, 
-  //     Cidade_da_sede: users.Cidade_da_sede,
-  // }
-
-  // for (const administratorEmail of arrEmails) {
-  //   await registrationAlert(body, administratorEmail);
-  // }
-
-  // return res.status(200).json({
-  //     success: true,
-  //     message: 'E-mail verificado com sucesso',
-  //     users, 
-  // });
-
-     
-  // } catch (error) {
-  //     console.log("Error desde validateEmail ", error);
-
-  //     let errorMessage = 'Algo deu errado, por favor, entre em contato com o administrador';
-      
-
-  //     if (
-  //       error.message.includes('O e-mail já está verificado') ||
-  //       error.message.includes('Usuário não encontrado') ||
-  //       error.message.includes('Usuário excluído') 
-  //     ) {
-  //       errorMessage = error.message;
-  //     }
-
-  //     return res.status(500).json({
-  //         success: false,
-  //         error: errorMessage
-  //     });
-  // }
-}
 
  const refreshToken = async (req, res) => {
 
@@ -448,12 +417,72 @@ const validateEmail = async (req, res) => {
   }
 };
 
+const resendPassword = async (req, res=response) => {
+
+  try {
+
+      const { email }  = req.body;
+
+      if (!email) {
+        return res.status(400).json({
+          success: false,
+          message: 'El campo email es obligatorio.',
+        });
+      }
+
+
+      const user = await Users.findOne({where:{email}});
+
+      if(!user){
+
+        return res.status(400).json({
+          success: false,
+          message: `El email: ${email} no existe en nuestra base de datos. Contacte al administrador.` 
+        })
+
+      }
+
+    //  envia password de 6 digitos
+     const genPassword = await generatePassword();
+
+     const salt = bcryptjs.genSaltSync();
+     const hashedPassword = bcryptjs.hashSync(genPassword, salt);
+   
+     
+    await emailRecover(user.email, genPassword);
+     
+    await Users.update({password: hashedPassword}, { where: {iduser: user.iduser} });
+
+  
+  return res.status(200).json({
+    success: true,
+    message: "📬 Te enviamos un correo con tu nueva contraseña. Revisá tu bandeja de entrada y también la carpeta de spam."
+  });
+
+
+  } catch (error) {
+
+    console.log("Error resendPassword: ", error);
+    const currentDate = moment().utc().format(); 
+    logger.error(`getAllCreditCards: ${currentDate}, message: ${error.message}`);
+
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+
+  }
+}
+
+
   export { 
             login,
             logout,
+            googleCallback,
             me,
             signUp,
-            validateEmail,
-            refreshToken
+            refreshToken,
+            resendPassword,
+            rememberUserAuth
   }
 
